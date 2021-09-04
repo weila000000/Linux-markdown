@@ -1,0 +1,43 @@
+0.filebeat配置文件添加模块参数
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: enable
+
+1.激活模块
+filebeat modules list
+filebeat modules enable nginx
+filebeat modules list
+
+2.配置日志路径
+- module: nginx
+  access:
+    enabled: true
+    var.paths: ["/var/log/nginx/access.log"]
+  error:
+    enabled: true
+    var.paths: ["/var/log/nginx/error.log"]
+
+3.修改filebeat配置文件
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: enable
+
+filebeat.modules:
+- module: nginx
+
+output.elasticsearch:
+  hosts: ["10.0.0.51:9200"]
+  indices:
+    - index: "nginx-access-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        log.file.path: "/var/log/nginx/access.log"
+
+    - index: "nginx-error-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        log.file.path: "/var/log/nginx/error.log"
+
+setup.ilm.enabled: false
+setup.template.enabled: false
+
+4.重启filebeat
+systemctl restart filebeat

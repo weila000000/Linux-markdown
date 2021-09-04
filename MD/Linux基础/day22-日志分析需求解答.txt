@@ -1,0 +1,96 @@
+[
+"2021-04-14 00:00:00",
+"223.104.36.83:63069",
+"apiv2-rds.3yakj.com",
+"POST",
+200,
+"\/?service=App.User.Userinfo",
+16649,null,
+"vivo 5.9.1",
+"HTTP\/1.1",
+375
+]
+
+service=App.User.Userinfo
+service=App.Seeding.userList
+service=App.FamilyCenter.GetFamilyWeekInfo
+
+
+第1题思路:
+1.不要在生产服务器分析
+2.不要直接用cat或vim打开
+3.不要直接拿全部内容分析,先取几行看下格式,将前几行放到一个文本里
+4.拿这个文本来测试命令
+5.如果列特别多,可以用2分法
+6.将运行结果输出到文本里,以后不需要每次都运行awk了
+7.去重排序结果写入到文本里,方便后面查看
+命令记录:
+awk -F'[?"]' '{print $11}' 2021-04-14.log >> 1.txt
+wc -l 1.txt 
+ll 1.txt
+less 1.txt
+cat 1.txt |sort|uniq -c|sort -rn > sort.txt
+head -10 sort.txt
+ 351990 service=App.Liveshow.hotAward
+ 174249 service=App.Wsapi.Userinfo
+  99854 service=App.Seeding.Monthrank
+  99526 service=App.User.Userinfo
+  71505 service=App.PublicClass.financeNotify
+  68327 service=App.Seeding.UserList
+  68178 service=App.User.Myinfo
+  63720 service=App.Wsapi.newjoinroom
+  61872 service=App.Wsapi.onclose
+  60381 service=App.Wsapi.sendgift1
+
+
+第2题:统计某一时间段访问不重复的IP数量
+1.将时间短内的日志取出来
+2021-04-14 00:00
+2021-04-14 05:05
+
+awk '/2021-04-14 00:00:00/,/2021-04-14 00:00:01/' 2021-04-14.log > time.txt
+
+2.分析IP数量
+awk -F'[:"]' '{print $6}' time.txt >> ip.txt
+
+3.对IP进行去重排序统计
+cat ip.txt |sort|uniq -c|sort -rn > ip_sort.txt
+[root@oldboy log]# head -10 ip_sort.txt 
+  40044 47.103.144.36
+  28833 47.103.127.196
+  13896 47.103.97.109
+   6003 106.92.113.138
+   3896 223.90.121.154
+   2973 117.189.143.23
+   2638 122.9.69.120
+   2624 116.63.98.153
+   2568 116.63.44.202
+   2485 116.63.237.164
+[root@oldboy log]# wc -l ip.txt 
+340219 ip.txt
+
+第3题:统计所有接口的调用次数并显示出现次数最多的前二十的URL
+
+第4题.统计报错的接口
+
+第5题.统计HTTP响应状态码
+[root@oldboy log]# awk -F"," '{print $5}' time.txt >> http_status.txt
+[root@oldboy log]# grep -v "200" http_status.txt
+[root@oldboy log]# cat http_status.txt |sort|uniq -c|sort -rn
+ 332288 200
+   7746 504
+    153 499
+     32 502
+
+第6题:统计服务器并发量
+[root@oldboy log]# awk '/2021-04-14 00:00:00/,/2021-04-14 00:00:01/' 2021-04-14.log|wc -l
+60
+[root@oldboy log]# awk '/2021-04-14 00:30/,/2021-04-14 00:31/' 2021-04-14.log|wc -l
+2413
+
+第7题:比如 xxx.xxx.xxx.xxx  访问了 service=App.User.Userinfo 多少次  其他IP 访问这个接口多少次  做时间段 排序
+[root@oldboy log]# awk -F'[?":]' '{print $14,$6}' time.txt |sort|uniq -c|sort -rn > socket_ip.txt
+[root@oldboy log]# grep "service=App.Wsapi.sendgift1" socket_ip.txt 
+   6886 service=App.Wsapi.sendgift1 47.103.144.36
+   4575 service=App.Wsapi.sendgift1 47.103.127.196
+

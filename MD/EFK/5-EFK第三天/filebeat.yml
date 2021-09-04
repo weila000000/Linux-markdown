@@ -1,0 +1,30 @@
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/access.log
+  json.keys_under_root: true
+  json.overwrite_keys: true
+  tags: ["access"]
+
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/error.log
+  tags: ["error"]
+
+output.redis:
+  hosts: ["10.0.0.51"]
+  keys:
+  - key: "nginx_access"
+    when.contains:
+      tags: "access"
+  - key: "nginx_error"
+    when.contains:
+      tags: "error"
+
+setup.ilm.enabled: false
+setup.template.enabled: false
+
+logging.level: info
+logging.to_files: true

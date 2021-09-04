@@ -1,0 +1,20 @@
+1.自定义配置
+cp /etc/elasticsearch/elasticsearch.yml  /opt/
+cat > /etc/elasticsearch/elasticsearch.yml << 'EOF'    
+node.name: node-1
+path.data: /var/lib/elasticsearch
+path.logs: /var/log/elasticsearch
+bootstrap.memory_lock: true
+network.host: 127.0.0.1,10.0.0.51
+http.port: 9200
+discovery.seed_hosts: ["10.0.0.51"]
+cluster.initial_master_nodes: ["10.0.0.51"]
+EOF
+
+2.修改内存锁定配置
+systemctl edit elasticsearch
+[Service]
+LimitMEMLOCK=infinity
+
+systemctl daemon-reload
+systemctl restart elasticsearch.service

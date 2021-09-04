@@ -1,0 +1,45 @@
+#!/bin/bash 
+
+#1.显示服务信息
+echo "==============================
+服务器名:$(hostname)
+服务器IP:$(hostname -I)
+查询日志为:xxx.com_access.log
+查询时间为: $(date +%F)
+=============================="
+#2.PV数
+echo "PV数量为: $(wc -l bbs.xxxx.com_access.log|awk '{print $1}')"
+echo "=============================="
+#3.搜索引擎次数
+echo "搜索情况汇总"
+echo "搜索引擎总计访问次数: $(egrep -i 'bot|spider|Spider' bbs.xxxx.com_access.log |wc -l)"
+echo "Baidu访问次数：      $(egrep -i 'Baiduspider' bbs.xxxx.com_access.log |wc -l)"
+echo "bing访问次数：       $(egrep -i 'bingbot' bbs.xxxx.com_access.log |wc -l)"
+echo "Google访问次数：     $(egrep -i 'googlebot' bbs.xxxx.com_access.log |wc -l)"
+echo "sougou访问次数：     $(egrep -i 'Sogou web spider|pic.sogou.com' bbs.xxxx.com_access.log |wc -l)"
+echo "yisou访问次数：      $(egrep -i 'YisouSpider' bbs.xxxx.com_access.log |wc -l)"
+echo "brandwatch访问次数： $(egrep -i 'brandwatch' bbs.xxxx.com_access.log |wc -l)"
+#4.TOP IP
+echo "=============================="
+echo "访问最多IP前10为:"
+num=1
+exec < ip.txt
+while read line 
+do
+   num=`echo ${line}|awk '{print $1}'`
+   ip=`echo ${line}|awk '{print $2}'`
+   host=`curl -s cip.cc/${ip}|awk '/地址/{print $3}'`
+   echo "${num} ${ip} ${host}" 
+   sleep 2
+done
+
+#5.其他
+echo "=============================="
+echo "监控关键链接为：GET /thread-"
+echo "=============================="
+echo "关键链接PV访问次数: $(grep "GET /thread-" bbs.xxxx.com_access.log|wc -l)"
+echo "=============================="
+echo "关键链接平均响应时间为: $(grep "GET /thread-" bbs.xxxx.com_access.log|awk '{sum+=$NF} END {print  sum/NR}')"
+echo "=============================="
+echo "关键链接访问响应时间排名"
+echo "$(awk '{print $NF}' bbs.xxxx.com_access.log |grep -v "-"|cut -b -3|sort|uniq -c|sort -nr|head -10)"

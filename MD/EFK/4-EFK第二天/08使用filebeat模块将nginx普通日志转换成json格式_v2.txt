@@ -1,0 +1,58 @@
+使用filebeat模块将nginx普通日志转换成json格式
+
+0.把nginx修改为普通格式日志
+systemctl stop nginx
+> /var/log/nginx/access.log
+vim /etc/nginx/nginx.conf
+access_log  /var/log/nginx/access.log  main;
+----------------------------------------------
+systemctl restart nginx 
+curl 127.0.0.1 
+tail -f /var/log/nginx/access.log
+
+1.配置filebeat
+cat > /etc/filebeat/filebeat.yml << 'EOF'
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: true 
+
+output.elasticsearch:
+  hosts: ["10.0.0.51:9200"]
+  indices:
+    - index: "nginx-access-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        log.file.path: "/var/log/nginx/access.log"
+
+    - index: "nginx-error-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        log.file.path: "/var/log/nginx/error.log"
+
+setup.ilm.enabled: false
+setup.template.enabled: false
+
+logging.level: info
+logging.to_files: true
+EOF
+
+2.激活模块
+filebeat modules list
+filebeat modules enable nginx
+filebeat modules list
+
+3.配置日志路径
+cat > /etc/filebeat/modules.d/nginx.yml << 'EOF'
+- module: nginx
+  access:
+    enabled: true
+    var.paths: ["/var/log/nginx/access.log"]
+  error:
+    enabled: true
+    var.paths: ["/var/log/nginx/error.log"]
+  ingress_controller:
+    enabled: false
+EOF
+
+4.重启filebeat
+systemctl restart filebeat
+
+5.访问测试

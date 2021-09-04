@@ -1,0 +1,41 @@
+使用Redis作为EBK缓存
+
+1.修改nginx修改为json格式
+systemctl stop nginx
+> /var/log/nginx/access.log
+vim /etc/nginx/nginx.conf
+access_log  /var/log/nginx/access.log  json;
+systemctl restart nginx
+curl 127.0.0.1
+cat /var/log/nginx/access.log
+
+2.安装部署redis
+yum install redis -y
+vim /etc/redis.conf
+bind 127.0.0.1 10.0.0.51
+systemctl restart redis 
+redis-cli -h 10.0.0.51
+
+3.修改filebeat配置文件
+cat > /etc/filebeat/filebeat.yml << 'EOF'
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/access.log
+  json.keys_under_root: true
+  json.overwrite_keys: true
+
+output.redis:
+  hosts: ["10.0.0.51"]
+  key: "nginx_access"
+
+setup.ilm.enabled: false
+setup.template.enabled: false
+
+logging.level: info
+logging.to_files: true
+EOF
+systemctl restart filebeat
+
+

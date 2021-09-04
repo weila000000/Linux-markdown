@@ -1,0 +1,94 @@
+收集MySQL慢日志
+0.清空ES以前的索引
+
+1.MySQL安装
+yum install -y libaio-devel
+rpm -qa|grep mariadb
+yum remove mariadb-libs -y
+rm -rf /etc/my.cnf
+tar zxf mysql-5.7.28-linux-glibc2.12-x86_64.tar.gz -C /opt/
+mv /opt/mysql-5.7.28-linux-glibc2.12-x86_64 /opt/mysql-5.7.28
+ln -s /opt/mysql-5.7.28 /opt/mysql 
+echo 'export PATH=$PATH:/opt/mysql/bin' >>/etc/profile
+source /etc/profile
+mysql -V
+useradd -s /sbin/nologin -M mysql
+mkdir -p /data/mysql_3306/
+chown -R mysql.mysql /data/
+chown -R mysql.mysql /opt/mysql*
+mysqld --initialize-insecure --user=mysql --basedir=/opt/mysql --datadir=/data/mysql_3306/
+cat> /etc/my.cnf <<EOF
+[mysqld]
+port=3306
+user=mysql
+basedir=/opt/mysql
+datadir=/data/mysql_3306
+socket=/tmp/mysql.sock
+slow_query_log=ON
+slow_query_log_file=/data/mysql_3306/slow.log
+long_query_time=1
+
+[mysql]
+socket=/tmp/mysql.sock
+EOF
+cp /opt/mysql/support-files/mysql.server  /etc/init.d/mysqld
+chkconfig --add mysqld
+systemctl start mysqld
+netstat -lntup|grep 3306
+
+2.生成慢日志
+mysql
+select sleep(2) user from mysql.user;
+select sleep(2) user,host from mysql.user;
+
+3.filebeat激活mysql模块
+filebeat modules list
+filebeat modules enable mysql
+filebeat modules list
+
+4.配置filebeat模块文件
+cat > /etc/filebeat/modules.d/mysql.yml << 'EOF' 
+- module: mysql
+  error:
+    enabled: true
+    var.paths: ["/data/mysql_3306/web-7.err"]
+  slowlog:
+    enabled: true
+    var.paths: ["/data/mysql_3306/slow.log"]
+EOF 
+
+5.配置filebeat配置文件
+cat > /etc/filebeat/filebeat.yml << 'EOF'
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: true 
+
+output.elasticsearch:
+  hosts: ["10.0.0.51:9200"]
+  indices:
+    - index: "nginx-access-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        log.file.path: "/var/log/nginx/access.log"
+
+    - index: "nginx-error-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        log.file.path: "/var/log/nginx/error.log"
+
+    - index: "mysql-error-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        log.file.path: "/data/mysql_3306/web-7.err"
+
+    - index: "mysql-slow-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        log.file.path: "/data/mysql_3306/slow.log"
+
+setup.ilm.enabled: false
+setup.template.enabled: false
+
+logging.level: info
+logging.to_files: true
+EOF
+
+6.重启filebeat
+systemctl restart filebeat
+

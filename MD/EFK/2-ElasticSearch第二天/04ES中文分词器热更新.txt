@@ -1,0 +1,41 @@
+1.安装nginx
+yum install nginx -y
+
+2.编写字典
+cat >>/usr/share/nginx/html/my_dic.txt<<EOF
+北京
+张亚
+武汉
+中国
+深圳
+EOF
+
+3.重启并测试
+nginx -t
+systemctl restart nginx 
+curl 127.0.0.1/my_dic.txt
+
+4.配置es的中文分词器插件
+cat >/etc/elasticsearch/analysis-ik/IKAnalyzer.cfg.xml<<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
+<properties>
+	<comment>IK Analyzer 扩展配置</comment>
+	<!--用户可以在这里配置自己的扩展字典 -->
+	<entry key="ext_dict"></entry>
+	 <!--用户可以在这里配置自己的扩展停止词字典-->
+	<entry key="ext_stopwords"></entry>
+	<!--用户可以在这里配置远程扩展字典 -->
+	<entry key="remote_ext_dict">http://10.0.0.51/my_dic.txt</entry>
+	<!--用户可以在这里配置远程扩展停止词字典-->
+	<!-- <entry key="remote_ext_stopwords">words_location</entry> -->
+</properties>
+EOF
+
+5.将修改好的IK配置文件复制到其他所有ES节点
+cd /etc/elasticsearch/analysis-ik/
+scp IKAnalyzer.cfg.xml 10.0.0.52:/etc/elasticsearch/analysis-ik/
+
+6.重启所有的ES节点
+systemctl restart elasticsearch.service 
+

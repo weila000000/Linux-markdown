@@ -1,0 +1,252 @@
+使用Redis作为EBK缓存
+
+1.修改nginx修改为json格式
+systemctl stop nginx
+> /var/log/nginx/access.log
+vim /etc/nginx/nginx.conf
+access_log  /var/log/nginx/access.log  json;
+systemctl restart nginx
+curl 127.0.0.1
+cat /var/log/nginx/access.log
+
+2.安装部署redis
+yum install redis -y
+vim /etc/redis.conf
+bind 127.0.0.1 10.0.0.51
+systemctl restart redis 
+redis-cli -h 10.0.0.51
+
+3.修改filebeat配置文件
+cat > /etc/filebeat/filebeat.yml << 'EOF'
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/access.log
+  json.keys_under_root: true
+  json.overwrite_keys: true
+  tags: ["access"]
+
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/error.log
+  tags: ["error"]
+
+output.redis:
+  hosts: ["10.0.0.51"]
+  keys:
+  - key: "nginx_access"
+    when.contains:
+      tags: "access"
+  - key: "nginx_error"
+    when.contains:
+      tags: "error"
+
+setup.ilm.enabled: false
+setup.template.enabled: false
+
+logging.level: info
+logging.to_files: true
+EOF
+systemctl restart filebeat
+
+4.生成测试数据
+for i in {0..100};do curl -s 127.0.0.1;done
+
+5.查看redis数据
+#查看有多少KEY
+10.0.0.51:6379> keys *
+1) "nginx_error"
+2) "nginx_access"
+
+#查看数据类型
+10.0.0.51:6379> TYPE nginx_access
+list
+
+#查看列表有多长
+10.0.0.51:6379> LLEN nginx_access
+(integer) 1001
+
+#查看列表元素
+10.0.0.51:6379> LRANGE nginx_access 0 10 
+
+6.安装logstash
+rpm -ivh jdk-8u181-linux-x64.rpm 
+rpm -ivh logstash-7.9.1.rpm
+
+7.编写logstash配置文件
+cat >/etc/logstash/conf.d/redis.conf << 'EOF'
+input {
+  redis {
+    host => "10.0.0.51"
+    port => "6379"
+    db => "0"
+    key => "nginx_access"
+    data_type => "list"
+  }
+  redis {
+    host => "10.0.0.51"
+    port => "6379"
+    db => "0"
+    key => "nginx_error"
+    data_type => "list"
+  }
+}
+
+output {
+   stdout {}
+   if "access" in [tags] {
+      elasticsearch {
+        hosts => "http://10.0.0.51:9200"
+        manage_template => false
+        index => "nginx_access-%{+yyyy.MM}"
+      }
+    }
+    if "error" in [tags] {
+      elasticsearch {
+        hosts => "http://10.0.0.51:9200"
+        manage_template => false
+        index => "nginx_error-%{+yyyy.MM}"
+      }
+    }
+}
+EOF
+
+8.前台启动logstash测试
+/usr/share/logstash/bin/logstash -f /etc/logstash/conf.d/redis.conf
+
+9.测试成功后使用systemd启动
+systemctl start logstash.service 
+systemctl status logstash.service 
+
+10.优化配置文件
+#优化filebeat配置文件
+cat > /etc/filebeat/filebeat.yml << 'EOF'
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/access.log
+  json.keys_under_root: true
+  json.overwrite_keys: true
+  tags: ["access"]
+
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/error.log
+  tags: ["error"]
+
+output.redis:
+  hosts: ["10.0.0.51"]
+  key: "nginx"
+
+setup.ilm.enabled: false
+setup.template.enabled: false
+
+logging.level: info
+logging.to_files: true
+EOF
+systemctl restart filebeat
+
+#优化logstash配置文件
+cat >/etc/logstash/conf.d/redis.conf << 'EOF'
+input {
+  redis {
+    host => "10.0.0.51"
+    port => "6379"
+    db => "0"
+    key => "nginx"
+    data_type => "list"
+  }
+}
+
+output {
+   stdout {}
+   if "access" in [tags] {
+      elasticsearch {
+        hosts => "http://10.0.0.51:9200"
+        manage_template => false
+        index => "nginx_access-%{+yyyy.MM}"
+      }
+    }
+    if "error" in [tags] {
+      elasticsearch {
+        hosts => "http://10.0.0.51:9200"
+        manage_template => false
+        index => "nginx_error-%{+yyyy.MM}"
+      }
+    }
+}
+EOF
+
+
+11.多个redis备份
+#filebeat读取多个redis
+cat > /etc/filebeat/filebeat.yml << 'EOF'
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/access.log
+  json.keys_under_root: true
+  json.overwrite_keys: true
+  tags: ["access"]
+
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/error.log
+  tags: ["error"]
+
+output.redis:
+  hosts: ["10.0.0.51","10.0.0.7"]
+  key: "nginx"
+
+setup.ilm.enabled: false
+setup.template.enabled: false
+
+logging.level: info
+logging.to_files: true
+EOF
+
+#logstash读取多个redis
+cat >/etc/logstash/conf.d/redis.conf << 'EOF'
+input {
+  redis {
+    host => "10.0.0.51"
+    port => "6379"
+    db => "0"
+    key => "nginx"
+    data_type => "list"
+  }
+}
+
+input {
+  redis {
+    host => "10.0.0.7"
+    port => "6379"
+    db => "0"
+    key => "nginx"
+    data_type => "list"
+  }
+}
+output {
+   stdout {}
+   if "access" in [tags] {
+      elasticsearch {
+        hosts => "http://10.0.0.51:9200"
+        manage_template => false
+        index => "nginx_access-%{+yyyy.MM}"
+      }
+    }
+    if "error" in [tags] {
+      elasticsearch {
+        hosts => "http://10.0.0.51:9200"
+        manage_template => false
+        index => "nginx_error-%{+yyyy.MM}"
+      }
+    }
+}
+EOF

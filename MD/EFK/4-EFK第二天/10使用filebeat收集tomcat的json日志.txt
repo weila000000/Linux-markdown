@@ -1,0 +1,71 @@
+
+1.安装tomcat
+tar zxf apache-tomcat-8.0.27.tar.gz -C /opt/
+tar zxf apache-tomcat-8.5.53.tar.gz -C /opt/
+cd /opt
+ln -s apache-tomcat-8.0.27 tomcat
+/opt/tomcat/bin/startup.sh 
+netstat -lntup|grep 8080
+ps -ef|grep tomcat
+curl -I 127.0.0.1:8080
+
+2.修改tomcat配置文件
+[root@web-7 ~]# sed -n '137p' /opt/tomcat/conf/server.xml 
+               pattern="{&quot;clientip&quot;:&quot;%h&quot;,&quot;ClientUser&quot;:&quot;%l&quot;,&quot;authenticated&quot;:&quot;%u&quot;,&quot;AccessTime&quot;:&quot;%t&quot;,&quot;method&quot;:&quot;%r&quot;,&quot;status&quot;:&quot;%s&quot;,&quot;SendBytes&quot;:&quot;%b&quot;,&quot;Query?string&quot;:&quot;%q&quot;,&quot;partner&quot;:&quot;%{Referer}i&quot;,&quot;AgentVersion&quot;:&quot;%{User-Agent}i&quot;}"/>
+
+3.重启tomcat
+/opt/tomcat/bin/shutdown.sh
+/opt/tomcat/bin/startup.sh
+
+4.访问并查看日志是否为json格式
+cat /opt/tomcat/logs/localhost_access_log.2021-07-15.txt 
+
+5.配置filebeat文件
+cat > /etc/filebeat/filebeat.yml << 'EOF'
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /opt/tomcat/logs/localhost_access_log.*.txt
+  json.keys_under_root: true
+  json.overwrite_keys: true
+  tags: ["tomcat"]
+
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: true 
+
+output.elasticsearch:
+  hosts: ["10.0.0.51:9200"]
+  indices:
+    - index: "nginx-access-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        log.file.path: "/var/log/nginx/access.log"
+
+    - index: "nginx-error-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        log.file.path: "/var/log/nginx/error.log"
+
+    - index: "mysql-error-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        log.file.path: "/data/mysql_3306/web-7.err"
+
+    - index: "mysql-slow-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        log.file.path: "/data/mysql_3306/slow.log"
+
+    - index: "tomcat-access-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        tags: "tomcat"
+
+setup.ilm.enabled: false
+setup.template.enabled: false
+
+logging.level: info
+logging.to_files: true
+EOF 
+
+6.重启filebeat
+systemctl restart filebeat 
+
+

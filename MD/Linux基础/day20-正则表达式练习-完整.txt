@@ -1,0 +1,260 @@
+--------------------
+^       以什么开头，"^oldboy" 表示匹配以oldboy单词开头的行
+$       以什么结尾，"oldboy$",表示匹配以oldboy单词结尾的行
+^$      组合符号，表示空行。逻辑解释就是以^开始，以$结尾的行
+.       匹配任意且只有一个字符，但是不匹配空行
+\       转义字符，让特殊符号失效，如"\."只表示小数点
+*       匹配前一个字符(连续出现)0次或1次以上，注意，当重复0次的时候，表示什么也没有，但是会撇皮所有内容
+.*      组合符，匹配所有内容
+[abc]   匹配[]内包含的任意一个字符a或b或c
+[a-z]   匹配[]内包含a-z任意一个字符
+[0-9]   匹配[]内包含0-9的任意一个数字
+[^abc]  匹配不包含^后的任意字符a或b或c，这里的^表示对[abc]的取反，与在外面的^意义不同
+--------------------
++		匹配前1个字符1次或多次
+[:/]+   匹配括号内的 ":" 或 "/" 字符1次或多次
+?       匹配前一个字符0次或1次
+|       表示或者，即同时过滤多个字符串
+()      分组过滤，被括起来的内容表示一个整体，另外()的内容可以被后面的\n引用，n为数字，表示引用第几个括号的内容
+\n      引用前面()里的内容，例如(abc)\1 表示匹配abcabc
+a{n,m}  匹配前一个字符最少n次，最多m次
+a{n,}   匹配前一个字符最少n次
+a{,m}   匹配前一个字符最多m次
+a{n}    匹配前一个字符正好n次
+
+基础正则表达式练习
+0) 测试文本
+cat > oldboy.txt << 'EOF'
+I am oldzhang !
+I teach linux.
+testtttsss000123566666asbclkkkallll
+
+I like swimming, football, basketball, video games
+#I like ChaShao TaiQiu 
+$my blog is https://www.cnblogs.com/alaska/
+#my site is https://www.jianshu.com/u/ee1c7fcea5b0
+my-qq is 526195417.
+my_phone is 15321312222222666644624.
+EOF
+
+1) ^ 查找以什么开头的行
+[root@oldboy grep]# grep "^I" oldboy.txt 
+I am oldzhang !
+I teach linux.
+I like swimming, football, basketball, video games
+
+2) $ 查找以什么结尾的行
+[root@oldboy grep]# grep "0$" oldboy.txt 
+#my site is https://www.jianshu.com/u/ee1c7fcea5b0
+
+[root@oldboy grep]# grep '\.$' oldboy.txt 
+I teach linux.
+my-qq is 526195417.
+my_phone is 15321312222222666644624.
+
+3) ^$ 查找和排除空行
+[root@oldboy grep]# grep '^I.*s$' oldboy.txt 
+I like swimming, football, basketball, video games
+
+[root@oldboy grep]# grep -n '^$' oldboy.txt 
+4:
+
+[root@oldboy grep]# 
+[root@oldboy grep]# grep -nv '^$' oldboy.txt 
+1:I am oldzhang !
+2:I teach linux.
+3:testtttsss000123566666asbclkkkallll
+5:I like swimming, football, basketball, video games
+6:#I like ChaShao TaiQiu 
+7:$my blog is https://www.cnblogs.com/alaska/
+8:#my site is https://www.jianshu.com/u/ee1c7fcea5b0
+9:my-qq is 526195417.
+10:my_phone is 15321312222222666644624.
+
+4) . 任意一个字符 不会匹配空行 包含空格
+[root@oldboy grep]# grep -n '.' oldboy.txt 
+1:I am oldzhang !
+2:I teach linux.
+3:testtttsss000123566666asbclkkkallll
+5:I like swimming, football, basketball, video games
+6:#I like ChaShao TaiQiu 
+7:$my blog is https://www.cnblogs.com/alaska/
+8:#my site is https://www.jianshu.com/u/ee1c7fcea5b0
+9:my-qq is 526195417.
+10:my_phone is 15321312222222666644624.
+
+5) \ 转义特殊字符
+[root@oldboy grep]# grep '^\$' oldboy.txt 
+$my blog is https://www.cnblogs.com/alaska/
+
+6) [ ]匹配字符
+[root@oldboy grep]# grep '[a-z]' oldboy.txt 
+I am oldzhang !
+I teach linux.
+testtttsss000123566666asbclkkkallll
+I like swimming, football, basketball, video games
+#I like ChaShao TaiQiu 
+$my blog is https://www.cnblogs.com/alaska/
+#my site is https://www.jianshu.com/u/ee1c7fcea5b0
+my-qq is 526195417.
+my_phone is 15321312222222666644624.
+
+[root@oldboy grep]# grep '[.!]$' oldboy.txt 
+I am oldzhang !
+I teach linux.
+my-qq is 526195417.
+my_phone is 15321312222222666644624.
+
+[root@oldboy grep]# grep '^I.*[^.!]$' oldboy.txt 
+I like swimming, football, basketball, video games
+
+7) -i 忽略大小写
+[root@oldboy grep]# grep -i '^i' oldboy.txt 
+I am oldzhang !
+I teach linux.
+I like swimming, football, basketball, video games
+
+
+拓展正则练习
+1）{}匹配手机号而不是QQ号 
+[root@oldboy grep]# grep -woE '[0-9]{9}' oldboy.txt 
+526195417
+[root@oldboy grep]# egrep -wo '[0-9]{9}' oldboy.txt 
+526195417
+
+2）查找出所有单词中出现字母连续的行，比如: www，http
+[root@oldboy grep]# grep -E '([a-z])\1{1,}' oldboy.txt 
+testtttsss000123566666asbclkkkallll
+I like swimming, football, basketball, video games
+$my blog is https://www.cnblogs.com/alaska/
+#my site is https://www.jianshu.com/u/ee1c7fcea5b0
+my-qq is 526195417.
+
+3）只查找出同一个字母连续3次的行，比如www
+[root@oldboy grep]# grep -E '([a-z])\1{2,}' oldboy.txt 
+testtttsss000123566666asbclkkkallll
+$my blog is https://www.cnblogs.com/alaska/
+#my site is https://www.jianshu.com/u/ee1c7fcea5b0
+
+4）提取网址www.xxx.com
+[root@oldboy grep]# grep -oE '([a-z])\1{1,}\.[a-Z0-9]{1,}\.[a-Z0-9]{1,}' oldboy.txt 
+www.cnblogs.com
+www.jianshu.com
+
+[root@oldboy grep]# 
+[root@oldboy grep]# grep -oiE '([a-z])\1{1,}\.[a-z0-9]{1,}\.[a-z0-9]{1,}' oldboy.txt 
+www.cnblogs.com
+www.jianshu.com
+
+5）提取完整的链接地址https://www.xxx.com
+[root@oldboy grep]# grep -oE 'http[s]?://([a-z])\1{1,}\.[a-z]+\.([a-z]+/[a-Z0-9]+/){1,}[a-Z0-9]{0,}' oldboy.txt 
+https://www.cnblogs.com/alaska/
+http://www.cnblogs.com/alaska/
+https://www.jianshu.com/u/ee1c7fcea5b0
+
+[root@oldboy grep]# grep -oE 'http[s]?://([a-z])\1{1,}\.[a-z]+\.[a-z]+/[a-Z0-9]+/.* ' oldboy.txt 
+https://www.cnblogs.com/alaska/ 
+http://www.cnblogs.com/alaska/ 
+https://www.jianshu.com/u/ee1c7fcea5b0 
+
+[root@oldboy grep]# grep -oE 'http[s]?://([a-z])\1{1,}\.[a-z]+\.[a-z]+/.* ' oldboy.txt 
+https://www.cnblogs.com/alaska/ 
+http://www.cnblogs.com/alaska/ 
+https://www.jianshu.com/u/ee1c7fcea5b0 
+
+[root@oldboy grep]# grep -oE ' h.*://(.*).(.*).(.*)/.* ' oldboy.txt 
+ https://www.cnblogs.com/alaska/ 
+ http://www.cnblogs.com/alaska/ 
+ https://www.jianshu.com/u/ee1c7fcea5b0
+
+[root@oldboy grep]# egrep -ion ' h.*://.*[/ ]+' oldboy.txt
+7: https://www.cnblogs.com/alaska/ 
+8: http://www.cnblogs.com/alaska/ 
+9: https://www.jianshu.com/u/ee1c7fcea5b0 
+
+[root@oldboy grep]# egrep -ion ' h.*[/ ]+' oldboy.txt
+7: https://www.cnblogs.com/alaska/ 
+8: http://www.cnblogs.com/alaska/ 
+9: https://www.jianshu.com/u/ee1c7fcea5b0 
+
+
+工作需求
+1）排除配置文件所有注释的行以及空行--必会
+[root@oldboy grep]# grep -v '#' oldboy.txt |grep -v '^$'
+I am oldzhang !
+I teach linux.
+testtttsss000123566666asbclkkkallll
+I like swimming, football, basketball, video games
+my-qq is 526195417.
+my_phone is 15321312222222666644624.
+
+[root@oldboy grep]# grep -Ev '^#|^$' oldboy.txt 
+I am oldzhang !
+I teach linux.
+testtttsss000123566666asbclkkkallll
+I like swimming, football, basketball, video games
+$my blog is https://www.cnblogs.com/alaska/ ###abc
+my blog is http://www.cnblogs.com/alaska/ ###abc
+my-qq is 526195417.
+my_phone is 15321312222222666644624.
+
+2）查找某个进程是否存在-秘技
+[root@oldboy grep]# ps aux|grep tail
+root      29482  0.0  0.0 108304   680 pts/1    S+   11:18   0:00 tail
+root      29486  0.0  0.0 112824   984 pts/0    R+   11:18   0:00 grep --color=auto tail
+[root@oldboy grep]# ps aux|grep tail|grep -v grep
+root      29482  0.0  0.0 108304   680 pts/1    S+   11:18   0:00 tail
+
+[root@oldboy grep]# ps aux|grep [t]ail
+root      29482  0.0  0.0 108304   680 pts/1    S+   11:18   0:00 tail
+---------------------------------
+输入的命令: 
+ps aux|grep tail
+
+查找关键词:
+tail
+
+进程名称:
+1.tail
+2.grep --color=auto tail
+---------------------------------
+输入的命令: 
+ps aux|grep [t]ail
+
+查找关键词:
+tail
+
+进程名称:
+1.tail
+2.grep --color=auto [t]ail
+---------------------------------
+
+3）查看sda磁盘的使用率
+[root@oldboy grep]# df -h|grep sda|grep  -oE '[0-9]+%'|grep -oE '[0-9]+'
+14
+
+4）取出eth0网卡的IP地址
+[root@oldboy grep]# ifconfig eth0|grep netmask|grep -oE '[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}'|head -1
+10.0.0.100
+
+[root@oldboy grep]# cat /etc/sysconfig/network-scripts/ifcfg-eth0|grep IPADDR|grep -o '[0-9].*'|tail -1
+10.0.0.100
+
+5）统计/etc/passwd所有shell为nologin的行并只显示用户名
+[root@oldboy grep]# grep 'nologin' /etc/passwd|grep -oE '^[0-9a-Z-]+'
+
+6）查找/dev/sda的UUID
+[root@oldboy grep]# blkid|grep sda|egrep -o '".*-[0-9a-Z]+"'|grep -Eo "[-0-9a-Z]+"
+cdd09439-3554-403c-9f77-b6b746fefb4c
+2YNqg4-uh9Q-0cOZ-mLEV-iJBb-wkUm-AksO5E
+
+[root@oldboy grep]# blkid | grep 'sda' | egrep -o '[a-Z0-9]{1,}-.*-[a-Z0-9]{1,}'
+cdd09439-3554-403c-9f77-b6b746fefb4c
+2YNqg4-uh9Q-0cOZ-mLEV-iJBb-wkUm-AksO5E
+
+[root@oldboy grep]# blkid /dev/sda1|grep -oE '([a-Z0-9]+\-){1,4}[a-Z0-9]+'
+cdd09439-3554-403c-9f77-b6b746fefb4c
+
+[root@oldboy grep]# blkid | grep sda1 | egrep -o '[a-z0-9-]+{15,}'
+cdd09439-3554-403c-9f77-b6b746fefb4c
+

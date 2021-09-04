@@ -1,0 +1,45 @@
+第1章 集群概念:
+主分片
+副本分片
+集群名称
+节点类型
+健康状态
+
+第2章 创建集群步骤
+0.停止并清空node-1的数据
+systemctl stop elasticsearch.service 
+systemctl stop kibana
+rm -rf /var/lib/elasticsearch/*
+rm -rf /var/lib/kibana/*
+
+1.新节点安装es
+rpm -ivh elasticsearch-7.9.1-x86_64.rpm 
+
+2.修改配置文件
+#node-1配置
+cat > /etc/elasticsearch/elasticsearch.yml << 'EOF'
+cluster.name: linux6
+node.name: node-1
+path.data: /var/lib/elasticsearch
+path.logs: /var/log/elasticsearch
+network.host: 127.0.0.1,10.0.0.51
+http.port: 9200
+discovery.seed_hosts: ["10.0.0.51","10.0.0.52"]
+cluster.initial_master_nodes: ["10.0.0.51"]
+EOF
+
+#node-2配置
+cat > /etc/elasticsearch/elasticsearch.yml << 'EOF'
+cluster.name: linux6
+node.name: node-2
+path.data: /var/lib/elasticsearch
+path.logs: /var/log/elasticsearch
+network.host: 127.0.0.1,10.0.0.52
+http.port: 9200
+discovery.seed_hosts: ["10.0.0.51","10.0.0.52"]
+cluster.initial_master_nodes: ["10.0.0.51"]
+EOF
+
+3.启动节点
+systemctl daemon-reload
+systemctl start elasticsearch.service 

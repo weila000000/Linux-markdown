@@ -1,0 +1,71 @@
+方法1:啰嗦
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/access.log
+  json.keys_under_root: true
+  json.overwrite_keys: true
+
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/error.log
+
+processors:
+  - drop_fields:
+      fields: ["ecs","log"] 
+
+output.elasticsearch:
+  hosts: ["10.0.0.51:9200"]
+  indices:
+    - index: "nginx-access-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        log.file.path: "/var/log/nginx/access.log"
+
+    - index: "nginx-error-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        log.file.path: "/var/log/nginx/error.log"
+
+setup.ilm.enabled: false
+setup.template.enabled: false
+
+logging.level: info
+logging.to_files: true
+
+方法2:优雅
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/access.log
+  json.keys_under_root: true
+  json.overwrite_keys: true
+  tags: ["access"]
+
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/error.log
+  tags: ["error"]
+
+processors:
+  - drop_fields:
+      fields: ["ecs","log"]
+
+output.elasticsearch:
+  hosts: ["10.0.0.51:9200"]
+  indices:
+    - index: "nginx-access-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        tags: "access"
+
+    - index: "nginx-error-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        tags: "error"
+
+setup.ilm.enabled: false
+setup.template.enabled: false
+
+logging.level: info
+logging.to_files: true

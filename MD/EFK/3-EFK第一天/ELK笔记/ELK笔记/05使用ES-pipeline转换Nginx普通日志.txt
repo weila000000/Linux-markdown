@@ -1,0 +1,79 @@
+0.grok转换语法:
+127.0.0.1 							==> %{IP:clientip}
+- 									==> -
+- 									==> -
+[08/Oct/2020:16:34:40 +0800] 		==> \\[%{HTTPDATE:nginx.access.time}\\]
+"GET / HTTP/1.1" 					==> "%{DATA:nginx.access.info}"
+200 								==> %{NUMBER:http.response.status_code:long} 
+5 									==> %{NUMBER:http.response.body.bytes:long}
+"-" 								==> "(-|%{DATA:http.request.referrer})"
+"curl/7.29.0" 						==> "(-|%{DATA:user_agent.original})"
+"-"									==> "(-|%{IP:clientip})"
+
+1.修改nginx日志为普通格式
+systemctl stop filebeat
+> /var/log/nginx/access.log
+vim /etc/nginx/nginx.conf
+systemctl restart nginx
+curl 127.0.0.1
+cat /var/log/nginx/access.log
+
+2.创建ES的pipeline
+GET _ingest/pipeline
+PUT  _ingest/pipeline/pipeline-nginx-access
+{
+  "description" : "nginx access log",
+  "processors": [
+    {
+      "grok": {
+        "field": "message",
+        "patterns": ["%{IP:clientip} - - \\[%{HTTPDATE:nginx.access.time}\\] \"%{DATA:nginx.access.info}\" %{NUMBER:http.response.status_code:long} %{NUMBER:http.response.body.bytes:long} \"(-|%{DATA:http.request.referrer})\" \"(-|%{DATA:user_agent.original})\""]
+      }
+    },{
+      "remove": {
+        "field": "message"
+      }
+    }
+  ]
+}
+
+3.修改filebeat配置文件
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/access.log
+  tags: ["access"]
+
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/error.log
+  tags: ["error"]
+
+processors:
+  - drop_fields:
+      fields: ["ecs","log"]
+
+output.elasticsearch:
+  hosts: ["10.0.0.51:9200"]
+
+  pipelines:
+    - pipeline: "pipeline-nginx-access"
+      when.contains:
+        tags: "access"
+
+  indices:
+    - index: "nginx-access-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        tags: "access"
+
+    - index: "nginx-error-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        tags: "error"
+
+setup.ilm.enabled: false
+setup.template.enabled: false
+
+logging.level: info
+logging.to_files: true

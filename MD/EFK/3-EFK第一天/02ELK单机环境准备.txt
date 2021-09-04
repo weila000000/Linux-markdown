@@ -1,0 +1,26 @@
+实验环境配置
+1.单节点ES配置
+rpm -ivh elasticsearch-7.9.1-x86_64.rpm
+cat > /etc/elasticsearch/elasticsearch.yml << 'EOF'    
+node.name: node-1
+path.data: /var/lib/elasticsearch
+path.logs: /var/log/elasticsearch
+network.host: 127.0.0.1,10.0.0.51
+http.port: 9200
+discovery.seed_hosts: ["10.0.0.51"]
+cluster.initial_master_nodes: ["10.0.0.51"]
+EOF
+systemctl daemon-reload
+systemctl start elasticsearch.service
+netstat -lntup|grep 9200
+curl 127.0.0.1:9200
+
+2.kibana安装部署
+rpm -ivh kibana-7.9.1-x86_64.rpm
+cat > /etc/kibana/kibana.yml << 'EOF'
+server.port: 5601
+server.host: "10.0.0.51"
+elasticsearch.hosts: ["http://10.0.0.51:9200"]
+kibana.index: ".kibana"
+EOF
+systemctl start kibana

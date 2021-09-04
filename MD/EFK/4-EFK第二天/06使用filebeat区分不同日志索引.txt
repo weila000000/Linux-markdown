@@ -1,0 +1,45 @@
+目前还不太完善的地方
+1.访问日志和错误日志混在一起了
+2.访问日志的格式和错误日志也不一样
+
+我们期望的结果:
+nginx-acess-7.9.1-2021.07
+nginx-error-7.9.1-2021.07
+
+filebeat配置文件:
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/access.log
+  json.keys_under_root: true
+  json.overwrite_keys: true
+
+- type: log
+  enabled: true
+  paths:
+    - /var/log/nginx/error.log
+
+output.elasticsearch:
+  hosts: ["10.0.0.51:9200"]
+  indices:
+    - index: "nginx-access-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        log.file.path: "/var/log/nginx/access.log"
+    - index: "nginx-error-%{[agent.version]}-%{+yyyy.MM}"
+      when.contains:
+        log.file.path: "/var/log/nginx/error.log"
+
+setup.ilm.enabled: false
+setup.template.enabled: false
+
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+
+		
+		
